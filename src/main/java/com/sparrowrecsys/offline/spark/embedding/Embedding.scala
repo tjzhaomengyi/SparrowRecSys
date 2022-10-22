@@ -30,7 +30,7 @@ object Embedding {
     val ratingsResourcesPath = this.getClass.getResource(rawSampleDataPath)
     val ratingSamples = sparkSession.read.format("csv").option("header", "true").load(ratingsResourcesPath.getPath)
 
-    //sort by timestamp udf
+    //sort by timestamp udf，定义udf根据timestamp升序排列
     val sortUdf: UserDefinedFunction = udf((rows: Seq[Row]) => {
       rows.map { case Row(movieId: String, timestamp: String) => (movieId, timestamp) }
         .sortBy { case (_, timestamp) => timestamp }
@@ -44,7 +44,7 @@ object Embedding {
       .where(col("rating") >= 3.5)
       .groupBy("userId")
       .agg(sortUdf(collect_list(struct("movieId", "timestamp"))) as "movieIds")
-      .withColumn("movieIdStr", array_join(col("movieIds"), " "))
+      .withColumn("movieIdStr", array_join(col("movieIds"), " "))//把id连成字符串
 
     userSeq.select("userId", "movieIdStr").show(10, truncate = false)
     userSeq.select("movieIdStr").rdd.map(r => r.getAs[String]("movieIdStr").split(" ").toSeq)
@@ -56,6 +56,8 @@ object Embedding {
     ratingSamples.show(10, false)
 
     val userEmbeddings = new ArrayBuffer[(String, Array[Float])]()
+
+
 
     ratingSamples.collect().groupBy(_.getAs[String]("userId"))
       .foreach(user => {
@@ -109,7 +111,7 @@ object Embedding {
     val model = word2vec.fit(samples)
 
 
-    val synonyms = model.findSynonyms("158", 20)
+    val synonyms = model.findSynonyms("158", 20)//找到和158号电影相似的
     for ((synonym, cosineSimilarity) <- synonyms) {
       println(s"$synonym $cosineSimilarity")
     }
@@ -144,6 +146,8 @@ object Embedding {
     val randomDouble = Random.nextDouble()
     var firstItem = ""
     var accumulateProb:Double = 0D
+    //模型:【graph embedding】1、随机出第一个点
+    //模型:【graph embedding】输入itemDistribution格式:(fromItem1，cnt)，(fromItem2,cnt)....
     breakable { for ((item, prob) <- itemDistribution) {
       accumulateProb += prob
       if (accumulateProb >= randomDouble){
@@ -154,19 +158,20 @@ object Embedding {
 
     sample.append(firstItem)
     var curElement = firstItem
-
     breakable { for(_ <- 1 until sampleLength) {
+      //模型:【graph embedding】itemDistribution格式:(fromItem1，cnt)，(fromItem2,cnt)....
+      //模型:【graph embedding】transitionMatrix格式:fromItem|(toItem1,cnt),(toItem2,cnt).....
       if (!itemDistribution.contains(curElement) || !transitionMatrix.contains(curElement)){
         break
       }
 
       val probDistribution = transitionMatrix(curElement)
-      val randomDouble = Random.nextDouble()
+      val randomDouble = Random.nextDouble()//模型:【graph embedding】random walk1过程、随机出一个概率
       var accumulateProb: Double = 0D
       breakable { for ((item, prob) <- probDistribution) {
-        accumulateProb += prob
+        accumulateProb += prob//模型:【graph embedding】random walk过程2、把每个点取出来，概率相加
         if (accumulateProb >= randomDouble){
-          curElement = item
+          curElement = item//模型:【graph embedding】random walk过程3、如果当前求和概率大于了random值，替换当前节点
           break
         }
       }}
@@ -175,6 +180,8 @@ object Embedding {
     Seq(sample.toList : _*)
   }
 
+  //模型:【graph embedding】输入transitionMatrix格式:fromItem|(toItem1,cnt),(toItem2,cnt).....
+  //模型:【graph embedding】输入itemDistribution格式:(fromItem1，cnt)，(fromItem2,cnt)....
   def randomWalk(transitionMatrix : mutable.Map[String, mutable.Map[String, Double]], itemDistribution : mutable.Map[String, Double], sampleCount:Int, sampleLength:Int): Seq[Seq[String]] ={
     val samples = mutable.ListBuffer[Seq[String]]()
     for(_ <- 1 to sampleCount) {
@@ -183,21 +190,24 @@ object Embedding {
     Seq(samples.toList : _*)
   }
 
+  //模型:【graph embedding】输入观影序列样本，userID | movieId1，movieId2....
   def generateTransitionMatrix(samples : RDD[Seq[String]]): (mutable.Map[String, mutable.Map[String, Double]], mutable.Map[String, Double]) ={
     val pairSamples = samples.flatMap[(String, String)]( sample => {
       var pairSeq = Seq[(String,String)]()
       var previousItem:String = null
-      sample.foreach((element:String) => {
+      sample.foreach((element:String) => { //模型:【graph embedding】element是用户观看的每部电影id
         if(previousItem != null){
-          pairSeq = pairSeq :+ (previousItem, element)
+          pairSeq = pairSeq :+ (previousItem, element)//模型:【graph embedding】添加当前元素(前一个观看，当前观看)
         }
         previousItem = element
       })
-      pairSeq
+      pairSeq//[(null,cur0),(cur0,cur1),....]
     })
 
-    val pairCountMap = pairSamples.countByValue()
+    val pairCountMap = pairSamples.countByValue()//模型:【graph embedding】统计每个观影对出现的个数
     var pairTotalCount = 0L
+    //模型:【graph embedding】转移概率矩阵的双层map数据结构，统计数来用的
+    //2.模型:【graph embedding】两个统计变量map
     val transitionCountMatrix = mutable.Map[String, mutable.Map[String, Long]]()
     val itemCountMap = mutable.Map[String, Long]()
 
@@ -205,25 +215,35 @@ object Embedding {
       val pairItems = pair._1
       val count = pair._2
 
-      if(!transitionCountMatrix.contains(pairItems._1)){
+      if(!transitionCountMatrix.contains(pairItems._1)){//模型:【graph embedding】在转移矩阵中没有这个电影id，往里添加，但是元素是一个空集合
         transitionCountMatrix(pairItems._1) = mutable.Map[String, Long]()
       }
 
-      transitionCountMatrix(pairItems._1)(pairItems._2) = count
-      itemCountMap(pairItems._1) = itemCountMap.getOrElse[Long](pairItems._1, 0) + count
-      pairTotalCount = pairTotalCount + count
+      transitionCountMatrix(pairItems._1)(pairItems._2) = count//模型:【graph embedding】从pairItems._1到pairItems._2导入的次数一共有count次
+      itemCountMap(pairItems._1) = itemCountMap.getOrElse[Long](pairItems._1, 0) + count//模型:【graph embedding】统计从pairItems._1为起点一共多少pair对
+      pairTotalCount = pairTotalCount + count//模型:【graph embedding】统计一共多少pair对
     })
 
+    //1.模型:【graph embedding】两个结果变量map
     val transitionMatrix = mutable.Map[String, mutable.Map[String, Double]]()
     val itemDistribution = mutable.Map[String, Double]()
 
+    //模型:【graph embedding】transitionCountMatrix格式:fromItemId | (toItemId1,count),(toItemId2,count)......
     transitionCountMatrix foreach {
       case (itemAId, transitionMap) =>
         transitionMatrix(itemAId) = mutable.Map[String, Double]()
-        transitionMap foreach { case (itemBId, transitionCount) => transitionMatrix(itemAId)(itemBId) = transitionCount.toDouble / itemCountMap(itemAId) }
+        transitionMap foreach {
+          //模型:【graph embedding】从(toItemId1,count),(toItemId2,count)......中挨个取出元素
+          case (itemBId, transitionCount) =>
+            transitionMatrix(itemAId)(itemBId) = transitionCount.toDouble / itemCountMap(itemAId) //模型:【graph embedding】计算从fromItemId到toItemId的转移概率
+        }
     }
 
-    itemCountMap foreach { case (itemId, itemCount) => itemDistribution(itemId) = itemCount.toDouble / pairTotalCount }
+    //模型:【graph embedding】从itemCountMap计算每个fromItemId占总数的百分比
+    itemCountMap foreach {
+      case (itemId, itemCount) =>
+        itemDistribution(itemId) = itemCount.toDouble / pairTotalCount
+    }
     (transitionMatrix, itemDistribution)
   }
 
@@ -280,7 +300,7 @@ object Embedding {
 
     val samples = processItemSequence(spark, rawSampleDataPath)
     val model = trainItem2vec(spark, samples, embLength, "item2vecEmb.csv", saveToRedis = false, "i2vEmb")
-    //graphEmb(samples, spark, embLength, "itemGraphEmb.csv", saveToRedis = true, "graphEmb")
-    //generateUserEmb(spark, rawSampleDataPath, model, embLength, "userEmb.csv", saveToRedis = false, "uEmb")
+    graphEmb(samples, spark, embLength, "itemGraphEmb.csv", saveToRedis = true, "graphEmb")
+    generateUserEmb(spark, rawSampleDataPath, model, embLength, "userEmb.csv", saveToRedis = true, "uEmb")
   }
 }

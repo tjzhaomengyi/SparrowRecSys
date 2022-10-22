@@ -22,15 +22,15 @@ public class MovieService extends HttpServlet {
             response.setCharacterEncoding("UTF-8");
             response.setHeader("Access-Control-Allow-Origin", "*");
 
-            //get movie id via url parameter
+            //get movie id via url parameter，服务:请求的参数
             String movieId = request.getParameter("id");
 
-            //get movie object from DataManager
+            //get movie object from DataManager，服务:DataManager是数据管理的核心
             Movie movie = DataManager.getInstance().getMovieById(Integer.parseInt(movieId));
 
             //convert movie object to json format and return
             if (null != movie) {
-                ObjectMapper mapper = new ObjectMapper();
+                ObjectMapper mapper = new ObjectMapper();//服务:使用fastjson包装返回数据
                 String jsonMovie = mapper.writeValueAsString(movie);
                 response.getWriter().println(jsonMovie);
             }else {

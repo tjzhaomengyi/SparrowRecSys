@@ -36,6 +36,7 @@ public class SimilarMovieProcess {
      * @param movie input movie object
      * @return  movie candidates
      */
+    //模型:召回方法1:单一召回策略--只召回评分最高且相似的前50个
     public static List<Movie> candidateGenerator(Movie movie){
         HashMap<Integer, Movie> candidateMap = new HashMap<>();
         for (String genre : movie.getGenres()){
@@ -53,6 +54,7 @@ public class SimilarMovieProcess {
      * @param movie input movie object
      * @return movie candidates
      */
+    //模型:召回策略2--多路召回:基于一些策略规则进行召回
     public static List<Movie> multipleRetrievalCandidates(Movie movie){
         if (null == movie){
             return null;
@@ -93,14 +95,16 @@ public class SimilarMovieProcess {
             return null;
         }
 
+        //获取所有作品集，10000部，根据rating排序
         List<Movie> allCandidates = DataManager.getInstance().getMovies(10000, "rating");
         HashMap<Movie,Double> movieScoreMap = new HashMap<>();
         for (Movie candidate : allCandidates){
-            double similarity = calculateEmbSimilarScore(movie, candidate);
+            double similarity = calculateEmbSimilarScore(movie, candidate);//计算相似度
             movieScoreMap.put(candidate, similarity);
         }
 
         List<Map.Entry<Movie,Double>> movieScoreList = new ArrayList<>(movieScoreMap.entrySet());
+        //按照用户-电影embedding相似度进行后续那电影排序
         movieScoreList.sort(Map.Entry.comparingByValue());
 
         List<Movie> candidates = new ArrayList<>();
@@ -149,7 +153,9 @@ public class SimilarMovieProcess {
                 sameGenreCount++;
             }
         }
-        double genreSimilarity = (double)sameGenreCount / (movie.getGenres().size() + candidate.getGenres().size()) / 2;
+        double genreSimilarity = (double)sameGenreCount / (movie.
+
+            getGenres().size() + candidate.getGenres().size()) / 2;
         double ratingScore = candidate.getAverageRating() / 5;
 
         double similarityWeight = 0.7;

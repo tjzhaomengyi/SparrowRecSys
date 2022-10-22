@@ -14,6 +14,7 @@ object FeatureEngineering {
    * @param samples movie samples dataframe
    */
   def oneHotEncoderExample(samples:DataFrame): Unit ={
+    //模型:onehot编码示例
     val samplesWithIdNumber = samples.withColumn("movieIdNumber", col("movieId").cast(sql.types.IntegerType))
 
     val oneHotEncoder = new OneHotEncoderEstimator()
@@ -33,21 +34,22 @@ object FeatureEngineering {
    * @param samples movie samples dataframe
    */
   def multiHotEncoderExample(samples:DataFrame): Unit ={
+    //模型:一行多个元素“炸裂”成多行
     val samplesWithGenre = samples.select(col("movieId"), col("title"),explode(split(col("genres"), "\\|").cast("array<string>")).as("genre"))
     val genreIndexer = new StringIndexer().setInputCol("genre").setOutputCol("genreIndex")
 
     val stringIndexerModel : StringIndexerModel = genreIndexer.fit(samplesWithGenre)
 
     val genreIndexSamples = stringIndexerModel.transform(samplesWithGenre)
-      .withColumn("genreIndexInt", col("genreIndex").cast(sql.types.IntegerType))
+      .withColumn("genreIndexInt", col("genreIndex").cast(sql.types.IntegerType))//这个是用Int表示的
 
-    val indexSize = genreIndexSamples.agg(max(col("genreIndexInt"))).head().getAs[Int](0) + 1
+    val indexSize = genreIndexSamples.agg(max(col("genreIndexInt"))).head().getAs[Int](0) + 1 //获得所有类型的数量
 
     val processedSamples =  genreIndexSamples
       .groupBy(col("movieId")).agg(collect_list("genreIndexInt").as("genreIndexes"))
-        .withColumn("indexSize", typedLit(indexSize))
+        .withColumn("indexSize", typedLit(indexSize))//获取每部电影的类型
 
-    val finalSample = processedSamples.withColumn("vector", array2vec(col("genreIndexes"),col("indexSize")))
+    val finalSample = processedSamples.withColumn("vector", array2vec(col("genreIndexes"),col("indexSize")))//生成每部电影类型的稠密向量
     finalSample.printSchema()
     finalSample.show(10)
   }
@@ -63,11 +65,12 @@ object FeatureEngineering {
     samples.show(10)
 
     //calculate average movie rating score and rating count
+    //利用打分表ratings计算电影的评分，被打分次数等数值型特征
     val movieFeatures = samples.groupBy(col("movieId"))
-      .agg(count(lit(1)).as("ratingCount"),
-        avg(col("rating")).as("avgRating"),
-        variance(col("rating")).as("ratingVar"))
-        .withColumn("avgRatingVec", double2vec(col("avgRating")))
+      .agg(count(lit(1)).as("ratingCount"),//该电影被评分的次数
+        avg(col("rating")).as("avgRating"),//评分的平均值
+        variance(col("rating")).as("ratingVar"))//评分的方差
+        .withColumn("avgRatingVec", double2vec(col("avgRating")))//该部电影的所有评分
 
     movieFeatures.show(10)
 

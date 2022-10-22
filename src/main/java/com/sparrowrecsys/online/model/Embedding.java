@@ -5,6 +5,7 @@ import java.util.ArrayList;
 /**
  * Embedding Class, contains embedding vector and related calculation
  */
+//模型:Embedding类
 public class Embedding {
     //embedding vector
     ArrayList<Float> embVector;

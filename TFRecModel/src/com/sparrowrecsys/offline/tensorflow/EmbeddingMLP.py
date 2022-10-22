@@ -1,13 +1,16 @@
 import tensorflow as tf
 
 # Training samples path, change to your local path
+# training_samples_file_path = tf.keras.utils.get_file("trainingSamples.csv",
+#                                                      "file:///Users/zhewang/Workspace/SparrowRecSys/src/main"
+#                                                      "/resources/webroot/sampledata/trainingSamples.csv")
 training_samples_file_path = tf.keras.utils.get_file("trainingSamples.csv",
-                                                     "file:///Users/zhewang/Workspace/SparrowRecSys/src/main"
-                                                     "/resources/webroot/sampledata/trainingSamples.csv")
+                                                     "file:///E:/Projects/IdeaProjects/SparrowRecSys/src/main/resources/webroot/sampledata/trainingSamples.csv")
+
 # Test samples path, change to your local path
 test_samples_file_path = tf.keras.utils.get_file("testSamples.csv",
-                                                 "file:///Users/zhewang/Workspace/SparrowRecSys/src/main"
-                                                 "/resources/webroot/sampledata/testSamples.csv")
+                                                 "file:///E:/Projects/IdeaProjects/SparrowRecSys/src/main/resources"
+                                                 "/webroot/sampledata/testSamples.csv")
 
 
 # load sample as tf dataset
@@ -30,7 +33,7 @@ test_dataset = get_dataset(test_samples_file_path)
 genre_vocab = ['Film-Noir', 'Action', 'Adventure', 'Horror', 'Romance', 'War', 'Comedy', 'Western', 'Documentary',
                'Sci-Fi', 'Drama', 'Thriller',
                'Crime', 'Fantasy', 'Animation', 'IMAX', 'Mystery', 'Children', 'Musical']
-
+#把每个特征分配一个genre_vocab类型词表
 GENRE_FEATURES = {
     'userGenre1': genre_vocab,
     'userGenre2': genre_vocab,
@@ -46,8 +49,8 @@ GENRE_FEATURES = {
 categorical_columns = []
 for feature, vocab in GENRE_FEATURES.items():
     cat_col = tf.feature_column.categorical_column_with_vocabulary_list(
-        key=feature, vocabulary_list=vocab)
-    emb_col = tf.feature_column.embedding_column(cat_col, 10)
+        key=feature, vocabulary_list=vocab)#把每个feature进行one-hot
+    emb_col = tf.feature_column.embedding_column(cat_col, 10)#执行embedding
     categorical_columns.append(emb_col)
 # movie id embedding feature
 movie_col = tf.feature_column.categorical_column_with_identity(key='movieId', num_buckets=1001)
@@ -83,7 +86,7 @@ model.compile(
     metrics=['accuracy', tf.keras.metrics.AUC(curve='ROC'), tf.keras.metrics.AUC(curve='PR')])
 
 # train the model
-model.fit(train_dataset, epochs=5)
+model.fit(train_dataset, epochs=10)
 
 # evaluate the model
 test_loss, test_accuracy, test_roc_auc, test_pr_auc = model.evaluate(test_dataset)

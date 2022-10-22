@@ -2,12 +2,12 @@ import tensorflow as tf
 
 # Training samples path, change to your local path
 training_samples_file_path = tf.keras.utils.get_file("trainingSamples.csv",
-                                                     "file:///Users/zhewang/Workspace/SparrowRecSys/src/main"
-                                                     "/resources/webroot/sampledata/trainingSamples.csv")
+                                                     "file:///E:/Projects/IdeaProjects/SparrowRecSys/src/main/resources/webroot/sampledata/trainingSamples.csv")
+
 # Test samples path, change to your local path
 test_samples_file_path = tf.keras.utils.get_file("testSamples.csv",
-                                                 "file:///Users/zhewang/Workspace/SparrowRecSys/src/main"
-                                                 "/resources/webroot/sampledata/testSamples.csv")
+                                                 "file:///E:/Projects/IdeaProjects/SparrowRecSys/src/main/resources"
+                                                 "/webroot/sampledata/testSamples.csv")
 
 
 # load sample as tf dataset
@@ -52,13 +52,13 @@ inputs = {
 
 # movie id embedding feature
 movie_col = tf.feature_column.categorical_column_with_identity(key='movieId', num_buckets=1001)
-movie_emb_col = tf.feature_column.embedding_column(movie_col, 10)
-movie_ind_col = tf.feature_column.indicator_column(movie_col) # movid id indicator columns
+movie_emb_col = tf.feature_column.embedding_column(movie_col, 10)#Deep使用Embedding列
+movie_ind_col = tf.feature_column.indicator_column(movie_col) # movid id indicator columns,FM要使用原始列
 
 # user id embedding feature
 user_col = tf.feature_column.categorical_column_with_identity(key='userId', num_buckets=30001)
-user_emb_col = tf.feature_column.embedding_column(user_col, 10)
-user_ind_col = tf.feature_column.indicator_column(user_col) # user id indicator columns
+user_emb_col = tf.feature_column.embedding_column(user_col, 10)#Deep使用Embedding列
+user_ind_col = tf.feature_column.indicator_column(user_col) # user id indicator columns，FM要使用原始列
 
 # genre features vocabulary
 genre_vocab = ['Film-Noir', 'Action', 'Adventure', 'Horror', 'Romance', 'War', 'Comedy', 'Western', 'Documentary',
@@ -67,17 +67,19 @@ genre_vocab = ['Film-Noir', 'Action', 'Adventure', 'Horror', 'Romance', 'War', '
 # user genre embedding feature
 user_genre_col = tf.feature_column.categorical_column_with_vocabulary_list(key="userGenre1",
                                                                            vocabulary_list=genre_vocab)
-user_genre_emb_col = tf.feature_column.embedding_column(user_genre_col, 10)
-user_genre_ind_col = tf.feature_column.indicator_column(user_genre_col) # user genre indicator columns
+user_genre_emb_col = tf.feature_column.embedding_column(user_genre_col, 10)#Deep使用Embedding
+user_genre_ind_col = tf.feature_column.indicator_column(user_genre_col) # user genre indicator columns，FM使用原始
 # item genre embedding feature
 item_genre_col = tf.feature_column.categorical_column_with_vocabulary_list(key="movieGenre1",
                                                                            vocabulary_list=genre_vocab)
-item_genre_emb_col = tf.feature_column.embedding_column(item_genre_col, 10)
-item_genre_ind_col = tf.feature_column.indicator_column(item_genre_col) # item genre indicator columns
+item_genre_emb_col = tf.feature_column.embedding_column(item_genre_col, 10)#Deep使用Embedding
+item_genre_ind_col = tf.feature_column.indicator_column(item_genre_col) # item genre indicator columns，FM使用原始
 
 # fm first-order term columns: without embedding and concatenate to the output layer directly
+#FM部分列:定义“电影id，用户id，用户特征、电影特征”为fm的特征列
 fm_first_order_columns = [movie_ind_col, user_ind_col, user_genre_ind_col, item_genre_ind_col]
 
+#Deep部分列:有以下，直接使用movie_emb_col
 deep_feature_columns = [tf.feature_column.numeric_column('releaseYear'),
                         tf.feature_column.numeric_column('movieRatingCount'),
                         tf.feature_column.numeric_column('movieAvgRating'),

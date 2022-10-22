@@ -61,6 +61,7 @@ public class RecSysServer {
         context.getMimeTypes().addMimeMapping("txt","text/plain;charset=utf-8");
 
         //bind services with different servlets
+        //服务:加载数据服务和推荐服务
         context.addServlet(DefaultServlet.class,"/");
         context.addServlet(new ServletHolder(new MovieService()), "/getmovie");
         context.addServlet(new ServletHolder(new UserService()), "/getuser");
